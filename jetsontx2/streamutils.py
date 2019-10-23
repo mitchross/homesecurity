@@ -4,13 +4,15 @@ import time
 import threading
 import queue
 from tx2_config import qsize
+import math
 
 class VideoStream(threading.Thread):
 
-    def __init__(self, url, pos, frame_q, resolution=(360, 640), threaded=False):
+    def __init__(self, url, pos, parent, frame_q, resolution=(360, 640), threaded=False):
         super(VideoStream, self).__init__()
         self.cam = cv2.VideoCapture(url)
         self.pos = pos
+        self.parent = parent
         self.url = url
         self.resolution = resolution
         self.threaded = threaded
@@ -45,9 +47,17 @@ class VideoStream(threading.Thread):
             return this_frame
 
         else:
+            
+            #TODO
+            # numframes = self.parent.num_frames
+            
+            #for x in range(numframes +1):
+                
+            
             if self.pos == 1:
                 framebuffer[:self.resolution[0],
                             :self.resolution[1]] = this_frame
+
             elif self.pos == 2:
                 framebuffer[:self.resolution[0],
                             self.resolution[1]:] = this_frame
@@ -87,65 +97,60 @@ class VideoStream(threading.Thread):
 
 class VideoStreamHandler(object):
 
-    def __init__(self, urls, threaded=False, resolution=(360, 640)):
-        #super(VideoStreamHandler, self).__init__()
-        assert len(urls) == 4, 'At the moment this code can handle only 4 streams'
-        self.url1 = urls[0]
-        self.url2 = urls[1]
-        self.url3 = urls[2]
-        self.url4 = urls[3]
+    def __init__(self, cam_urls, threaded=False, resolution=(360, 640)):
+        
         self.threaded = threaded
         self.resolution = resolution
-        self.q1, self.q2, self.q3, self.q4 = self.setup_queues()
-        self.s1, self.s2, self.s3, self.s4 = self.setup_streams()
+        self.urls = []
+        self.queue = []
+        self.streams =[]
+        self.emptyframes = []
+
+        index = 0
+        for it in cam_urls:
+            self.urls.append(it)
+            self.queue.append( self.setup_queue() )
+            self.streams.append( self.setup_stream(index) )
+            self.emptyframes.append(self.streams[index].emptyframe)
+            index = index+1
+        self.num_frames = index
+        
         self.framebuffer = np.zeros(
-            (2 * resolution[0], 2 * resolution[1], 3), dtype=np.uint8)
-        self.emptyframes=[self.s1.emptyframe,self.s2.emptyframe,self.s3.emptyframe,self.s4.emptyframe]
+            ( math.floor( math.sqrt (self.num_frames) ) * resolution[0], math.ceil( math.sqrt (self.num_frames) )  * resolution[1], 3), dtype=np.uint8)
+        
         if self.threaded:
             self.start_streams()
 
-    def setup_streams(self):
-        stream1 = VideoStream(self.url1, 1, self.q1,
-                              self.resolution, self.threaded)
-        stream2 = VideoStream(self.url2, 2, self.q2,
-                              self.resolution, self.threaded)
-        stream3 = VideoStream(self.url3, 3, self.q3,
-                              self.resolution, self.threaded)
-        stream4 = VideoStream(self.url4, 4, self.q4,
+    def setup_stream(self, index):
+        return VideoStream(self.urls[index], index , self.queue[index],
                               self.resolution, self.threaded)
 
-        return stream1, stream2, stream3, stream4
-
-    def setup_queues(self):
+    def setup_queue(self):
         if self.threaded:
-            return queue.Queue(maxsize=qsize), queue.Queue(maxsize=qsize),\
-                queue.Queue(maxsize=qsize), queue.Queue(maxsize=qsize)
+            return queue.Queue(maxsize=qsize)
         else:
-            return None, None, None, None
+            return None
 
     def start_streams(self):
-        self.s1.start()
-        self.s2.start()
-        self.s3.start()
-        self.s4.start()
+        for stream in self.streams:
+            stream.start()
 
     def join_streams(self):
-        self.s1.join()
-        self.s2.join()
-        self.s3.join()
-        self.s4.join()
+        for stream in self.streams:
+            stream.join()
+
 
     def read_streams(self):
         if self.threaded:
-            self.read_queue(self.q1, 1)
-            self.read_queue(self.q2, 2)
-            self.read_queue(self.q3, 3)
-            self.read_queue(self.q4, 4)
+            
+            index = 1
+            for q in self.queue:
+                self.read_queue(q,index)
+                index = index + 1
         else:
-            self.s1.read(self.framebuffer)
-            self.s2.read(self.framebuffer)
-            self.s3.read(self.framebuffer)
-            self.s4.read(self.framebuffer)
+            
+            for stream in self.streams:
+                stream.read(self.framebuffer)
 
         return self.framebuffer
 

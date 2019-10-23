@@ -11,6 +11,8 @@ import cv2
 import tensorflow as tf
 import tensorflow.contrib.tensorrt as trt
 
+import load_cameras
+
 from utils.od_utils import read_label_map, load_trt_pb, detect
 from utils.visualization import BBoxVisualization
 from streamutils import VideoStreamHandler
@@ -111,15 +113,19 @@ def main():
 
     pb_path = './human_detection/{}_trt.pb'.format(MODEL)
     log_path = './jetsontx2/logs/{}_trt'.format(MODEL)
+    
+    camera_list = []
+    camera_list = load_cameras.load_cameras_from_file()
+    print(f'cameras: {camera_list}')
 
     logger.info('opening camera device/file')
 
-    url1='http://pi1.local:8000/stream.mjpg'
-    url2='http://pi2.local:8000/stream.mjpg'
-    url3='http://pi3.local:8000/stream.mjpg'
-    url4='http://pi4.local:8000/stream.mjpg'
+    url1='http://192.168.1.148:8000/stream.mjpg'
+    url2='http://192.168.1.148:8000/stream.mjpg'
+    url3='http://192.168.1.149:8000/stream.mjpg'
+    url4='http://192.168.1.149:8000/stream.mjpg'
     
-    stream_handler=VideoStreamHandler([url1,url2,url3,url4],threaded=threaded,resolution=(360,640))
+    stream_handler=VideoStreamHandler(camera_list,threaded=threaded,resolution=(360,640))
 
     logger.info('loading TRT graph from pb: %s' % pb_path)
     trt_graph = load_trt_pb(pb_path)

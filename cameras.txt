@@ -1,0 +1,1 @@
+{"cameras": ["http://192.168.1.148:8000/stream.mjpg", "http://192.168.1.148:8000/stream.mjpg","http://192.168.1.149:8000/stream.mjpg","http://192.168.1.149:8000/stream.mjpg"]}
